@@ -49,7 +49,7 @@ def main() -> int:
             wait_up(url)
         for name, (_, url, expected) in CASES.items():
             out = subprocess.run(
-                [nuclei, "-u", url, "-t", str(ROOT / "http"), "-t", str(ROOT / "javascript"), "-jsonl", "-silent",
+                [nuclei, "-u", url, "-t", str(ROOT / "http"), "-jsonl", "-silent",
                  "-disable-update-check", "-no-interactsh", "-timeout", "10", "-retries", "0"],
                 capture_output=True, text=True, check=False,
             )

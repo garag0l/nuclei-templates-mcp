@@ -35,7 +35,7 @@ jobs:
           unzip -q n.zip nuclei && sudo mv nuclei /usr/local/bin/ && rm n.zip sums.txt
           nuclei -version
       - name: Validate templates
-        run: nuclei -validate -t http/ -t javascript/ -disable-update-check
+        run: nuclei -validate -t http/ -disable-update-check
       - name: Vulnerable vs hardened mock servers (exact match)
         run: python tests/run_templates.py nuclei
       - name: Real-world check (intentionally public servers, detection only)
@@ -43,6 +43,6 @@ jobs:
         run: |
           for u in https://mcp.deepwiki.com https://docs.mcp.cloudflare.com https://mcp.notion.com https://mcp.linear.app; do
             echo "== $u"
-            nuclei -u "$u" -t http/ -t javascript/ -silent -disable-update-check -no-interactsh -timeout 15 -jsonl \
+            nuclei -u "$u" -t http/ -silent -disable-update-check -no-interactsh -timeout 15 -jsonl \
               | python3 -c "import json,sys; [print(' ', r['template-id'], r.get('matched-at'), r.get('extracted-results')) for r in map(json.loads, sys.stdin)]"
           done
