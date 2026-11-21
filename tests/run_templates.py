@@ -22,6 +22,9 @@ CASES = {
     "vulnerable": (["--port", "8801"], "http://127.0.0.1:8801",
                    {"mcp-unauthenticated-server", "mcp-tools-exposed", "mcp-cross-site-text-plain",
                     "mcp-dns-rebinding-host-not-validated", "mcp-sse-endpoint-unauthenticated"}),
+    "stateless": (["--port", "8803", "--stateless", "--no-sse"], "http://127.0.0.1:8803",
+                  {"mcp-unauthenticated-server", "mcp-tools-exposed", "mcp-cross-site-text-plain",
+                   "mcp-dns-rebinding-host-not-validated"}),
     "hardened": (["--port", "8802", "--auth", "--validate-host", "--strict-content-type", "--no-sse"],
                  "http://127.0.0.1:8802", {"mcp-oauth-protected-resource"}),
 }

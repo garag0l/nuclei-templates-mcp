@@ -18,7 +18,7 @@ info:
     max-request: 3
   tags: mcp,ai,llm,exposure,unauth,misconfig
 
-flow: http(1) && http(2)
+flow: http(1) && (http(2) || http(3))  # 2: stateful (session id), 3: stateless servers
 
 http:
   - method: POST
@@ -74,4 +74,34 @@ http:
         part: body
         group: 1
         regex:
-          - '"name"\s*:\s*"([A-Za-z0-9_.\-]{1,64})"\s*,\s*"(?:description|title|inputSchema)"'
+          - '"name"\s*:\s*"([A-Za-z0-9_.\-]{1,64})"'
+
+  - method: POST
+    path:
+      - "{{BaseURL}}/mcp"
+    headers:
+      Content-Type: application/json
+      Accept: application/json, text/event-stream
+      MCP-Protocol-Version: "2025-11-25"
+    body: '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+    max-size: 262144
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"tools"'
+          - '"inputSchema"'
+        condition: and
+
+    extractors:
+      - type: regex
+        name: tools
+        part: body
+        group: 1
+        regex:
+          - '"name"\s*:\s*"([A-Za-z0-9_.\-]{1,64})"'

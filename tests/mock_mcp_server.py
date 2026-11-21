@@ -20,6 +20,11 @@ TOOLS = [
 ]
 
 
+def sse_frame(body: bytes) -> bytes:
+    nl = b"\n"
+    return b"event: message" + nl + b"data: " + body + nl + nl
+
+
 def make_handler(cfg):
     class H(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -103,10 +108,15 @@ def make_handler(cfg):
             if method == "initialize":
                 result = {"protocolVersion": "2025-11-25", "capabilities": {"tools": {"listChanged": False}},
                           "serverInfo": {"name": "mock-mcp", "version": "1.2.3"}}
-                return self._send(200, json.dumps({"jsonrpc": "2.0", "id": mid, "result": result}).encode(),
-                                  extra={"Mcp-Session-Id": uuid.uuid4().hex})
+                body = json.dumps({"jsonrpc": "2.0", "id": mid, "result": result}).encode()
+                if cfg.stateless:  # like many hosted servers: no session id, SSE-framed response
+                    return self._send(200, sse_frame(body), ctype="text/event-stream")
+                return self._send(200, body, extra={"Mcp-Session-Id": uuid.uuid4().hex})
             if method == "tools/list":
-                return self._send(200, json.dumps({"jsonrpc": "2.0", "id": mid, "result": {"tools": TOOLS}}).encode())
+                body = json.dumps({"jsonrpc": "2.0", "id": mid, "result": {"tools": TOOLS}}).encode()
+                if cfg.stateless:
+                    return self._send(200, sse_frame(body), ctype="text/event-stream")
+                return self._send(200, body)
             if method and method.startswith("notifications/"):
                 return self._send(202)
             return self._send(200, json.dumps({"jsonrpc": "2.0", "id": mid, "error": {"code": -32601, "message": "not found"}}).encode())
@@ -121,6 +131,7 @@ def main():
     p.add_argument("--validate-host", action="store_true")
     p.add_argument("--strict-content-type", action="store_true")
     p.add_argument("--no-sse", dest="sse", action="store_false")
+    p.add_argument("--stateless", action="store_true", help="no Mcp-Session-Id; SSE-framed JSON-RPC responses")
     cfg = p.parse_args()
     srv = ThreadingHTTPServer(("127.0.0.1", cfg.port), make_handler(cfg))
     print(f"mock MCP on http://127.0.0.1:{cfg.port}", flush=True)
