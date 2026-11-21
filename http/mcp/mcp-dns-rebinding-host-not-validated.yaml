@@ -1,0 +1,49 @@
+id: mcp-dns-rebinding-host-not-validated
+
+info:
+  name: MCP Server - Host Header Not Validated (DNS Rebinding)
+  author: garag0l
+  severity: medium
+  description: |
+    The MCP server answers `initialize` for an arbitrary `Host` header and foreign `Origin`. For servers on
+    localhost or an internal network without authentication, this lets a malicious website use DNS
+    rebinding to reach the server through a victim's browser and invoke its tools. The official SDKs fixed
+    their insecure defaults in TypeScript 1.24.0, Python 1.23.0 and Go 1.4.0. It matters most for local
+    and internal servers; on a server that is deliberately public it is informational.
+    Detection only: sends one `initialize` request.
+  reference:
+    - https://github.com/advisories/GHSA-w48q-cv73-mx4w
+    - https://github.com/advisories/GHSA-9h52-p55h-vw2f
+    - https://github.com/advisories/GHSA-xw59-hvm2-8pj6
+  classification:
+    cwe-id: CWE-350
+  metadata:
+    verified: true
+    max-request: 1
+  tags: mcp,ai,llm,dns-rebinding,misconfig
+
+http:
+  - raw:
+      - |
+        POST /mcp HTTP/1.1
+        Host: rebind-check.nuclei.example
+        Origin: http://rebind-check.nuclei.example
+        Content-Type: application/json
+        Accept: application/json, text/event-stream
+        MCP-Protocol-Version: 2025-11-25
+
+        {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"nuclei","version":"1.0"}}}
+
+    max-size: 65536
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"protocolVersion"'
+          - '"serverInfo"'
+        condition: and

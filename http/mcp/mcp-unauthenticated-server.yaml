@@ -1,0 +1,64 @@
+id: mcp-unauthenticated-server
+
+info:
+  name: MCP Server - Unauthenticated Streamable HTTP Access
+  author: garag0l
+  severity: medium
+  description: |
+    The Model Context Protocol server completes an `initialize` handshake without any credentials.
+    Anyone who can reach it can list and call its tools with the server's permissions. Some servers are
+    public by design (for example documentation search); confirm the exposure is intended.
+    Detection only: sends one `initialize` request and calls no tools.
+  reference:
+    - https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+    - https://www.trendmicro.com/vinfo/us/security/news/vulnerabilities-and-exploits/update-on-exposed-mcp-servers-the-threat-widens-to-the-cloud
+  classification:
+    cwe-id: CWE-306
+  metadata:
+    verified: true
+    max-request: 5
+  tags: mcp,ai,llm,exposure,unauth,misconfig
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/mcp"
+      - "{{BaseURL}}/mcp/"
+      - "{{BaseURL}}/v1/mcp"
+      - "{{BaseURL}}/api/mcp"
+      - "{{BaseURL}}"
+    headers:
+      Content-Type: application/json
+      Accept: application/json, text/event-stream
+      MCP-Protocol-Version: "2025-11-25"
+    body: '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"nuclei","version":"1.0"}}}'
+
+    stop-at-first-match: true
+    max-size: 65536
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"jsonrpc"'
+          - '"protocolVersion"'
+          - '"serverInfo"'
+        condition: and
+
+    extractors:
+      - type: regex
+        name: server
+        part: body
+        group: 1
+        regex:
+          - '"serverInfo"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]{1,100})"'
+      - type: regex
+        name: version
+        part: body
+        group: 1
+        regex:
+          - '"serverInfo"\s*:\s*\{[^}]*"version"\s*:\s*"([^"]{1,50})"'

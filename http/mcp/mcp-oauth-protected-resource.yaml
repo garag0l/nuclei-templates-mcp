@@ -1,0 +1,47 @@
+id: mcp-oauth-protected-resource
+
+info:
+  name: MCP Server - OAuth Protected Resource Metadata (RFC 9728)
+  author: garag0l
+  severity: info
+  description: |
+    The host publishes OAuth 2.0 Protected Resource Metadata, as MCP servers that require authorization do.
+    The extracted `authorization_servers` show where clients are sent to sign in. Compare them with the
+    provider you expect; an unexpected authorization server is how credential-redirection attacks
+    (GHSA-6qxp-vccf-f47h, GHSA-qx49-fqc8-xw99) begin. Detection only.
+  reference:
+    - https://www.rfc-editor.org/rfc/rfc9728
+    - https://github.com/garag0l/mcp-issuer-check
+  metadata:
+    verified: true
+    max-request: 2
+  tags: mcp,ai,oauth,tech,discovery
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/.well-known/oauth-protected-resource/mcp"
+      - "{{BaseURL}}/.well-known/oauth-protected-resource"
+
+    stop-at-first-match: true
+    max-size: 65536
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"authorization_servers"'
+
+    extractors:
+      - type: json
+        name: authorization_servers
+        json:
+          - '.authorization_servers[]?'
+      - type: json
+        name: resource
+        json:
+          - '.resource'

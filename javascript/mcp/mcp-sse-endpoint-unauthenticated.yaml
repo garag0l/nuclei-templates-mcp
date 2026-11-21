@@ -1,0 +1,53 @@
+id: mcp-sse-endpoint-unauthenticated
+
+info:
+  name: MCP Server - Legacy SSE Transport Without Authentication
+  author: garag0l
+  severity: medium
+  description: |
+    The server exposes the legacy MCP HTTP+SSE transport (`GET /sse` returns an `endpoint` event with a
+    message URL) without credentials. Anyone who can reach it can open a session and call tools. The SSE
+    transport is deprecated in favor of Streamable HTTP. Detection only: reads the first bytes of the stream
+    and closes (a raw socket read, so the never-ending stream can't hang the scan).
+  reference:
+    - https://modelcontextprotocol.io/specification/2024-11-05/basic/transports
+  classification:
+    cwe-id: CWE-306
+  metadata:
+    verified: true
+    max-request: 1
+  tags: mcp,ai,llm,exposure,unauth,sse,misconfig
+
+javascript:
+  - code: |
+      let m = require("nuclei/net");
+      let address = Host + ":" + Port;
+      let conn = (Scheme === "https") ? m.OpenTLS("tcp", address) : m.Open("tcp", address);
+      conn.SetTimeout(6);
+      let crlf = String.fromCharCode(13, 10);
+      conn.Send("GET /sse HTTP/1.1" + crlf + "Host: " + Host + crlf + "Accept: text/event-stream" + crlf + "User-Agent: nuclei" + crlf + crlf);
+      let resp = conn.RecvString(512);
+      conn.Close();
+      resp;
+
+    args:
+      Host: "{{Host}}"
+      Port: "{{Port}}"
+      Scheme: "{{Scheme}}"
+
+    matchers-condition: and
+    matchers:
+      - type: word
+        part: response
+        words:
+          - "text/event-stream"
+          - "event: endpoint"
+        condition: and
+
+    extractors:
+      - type: regex
+        name: endpoint
+        part: response
+        group: 1
+        regex:
+          - 'data: (/\S{1,200})'

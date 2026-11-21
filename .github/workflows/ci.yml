@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      realworld:
+        description: Also run against intentionally public MCP servers
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  NUCLEI_VERSION: "3.11.1"
+
+jobs:
+  templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install nuclei (pinned, checksum-verified)
+        run: |
+          v="$NUCLEI_VERSION"; base="https://github.com/projectdiscovery/nuclei/releases/download/v${v}"
+          curl -sSL -o n.zip "$base/nuclei_${v}_linux_amd64.zip"
+          curl -sSL -o sums.txt "$base/nuclei_${v}_checksums.txt"
+          grep "nuclei_${v}_linux_amd64.zip" sums.txt | awk '{print $1"  n.zip"}' | sha256sum -c -
+          unzip -q n.zip nuclei && sudo mv nuclei /usr/local/bin/ && rm n.zip sums.txt
+          nuclei -version
+      - name: Validate templates
+        run: nuclei -validate -t http/ -t javascript/ -disable-update-check
+      - name: Vulnerable vs hardened mock servers (exact match)
+        run: python tests/run_templates.py nuclei
+      - name: Real-world check (intentionally public servers, detection only)
+        if: ${{ github.event.inputs.realworld == 'true' }}
+        run: |
+          for u in https://mcp.deepwiki.com https://docs.mcp.cloudflare.com https://mcp.notion.com https://mcp.linear.app; do
+            echo "== $u"
+            nuclei -u "$u" -t http/ -t javascript/ -silent -disable-update-check -no-interactsh -timeout 15 -jsonl \
+              | python3 -c "import json,sys; [print(' ', r['template-id'], r.get('matched-at'), r.get('extracted-results')) for r in map(json.loads, sys.stdin)]"
+          done

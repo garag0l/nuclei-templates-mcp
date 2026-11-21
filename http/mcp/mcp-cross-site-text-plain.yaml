@@ -1,0 +1,48 @@
+id: mcp-cross-site-text-plain
+
+info:
+  name: MCP Server - Accepts Cross-Site text/plain JSON-RPC (CVE-2026-33252 behavior)
+  author: garag0l
+  severity: high
+  description: |
+    The MCP server processes a JSON-RPC `initialize` sent as `Content-Type: text/plain` with a foreign
+    `Origin`. Browsers send this kind of request cross-site without a CORS preflight, so any web page a
+    user visits can drive an unauthenticated MCP server they can reach (for example on localhost). This is
+    the behavior fixed in the MCP Go SDK v1.4.1 (CVE-2026-33252). Other servers can show it too.
+    Detection only: sends one `initialize` request.
+  reference:
+    - https://github.com/advisories/GHSA-89xv-2j6f-qhc8
+    - https://nvd.nist.gov/vuln/detail/CVE-2026-33252
+  classification:
+    cve-id: CVE-2026-33252
+    cwe-id: CWE-352
+  metadata:
+    verified: true
+    max-request: 2
+  tags: cve,cve2026,mcp,ai,llm,csrf,cors
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/mcp"
+      - "{{BaseURL}}"
+    headers:
+      Content-Type: text/plain;charset=UTF-8
+      Origin: https://nuclei-cross-site.example
+      Accept: application/json, text/event-stream
+    body: '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"nuclei","version":"1.0"}}}'
+
+    stop-at-first-match: true
+    max-size: 65536
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"protocolVersion"'
+          - '"serverInfo"'
+        condition: and

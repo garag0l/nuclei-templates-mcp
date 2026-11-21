@@ -1,0 +1,77 @@
+id: mcp-tools-exposed
+
+info:
+  name: MCP Server - Tools Listed Without Authentication
+  author: garag0l
+  severity: high
+  description: |
+    Without credentials, the MCP server completes `initialize` and returns its tool list (`tools/list`).
+    The extracted tool names show what an unauthenticated caller could invoke. Review them for anything that
+    reads data, writes data or runs commands. Detection only: lists tools and never calls one.
+  reference:
+    - https://modelcontextprotocol.io/specification/2025-11-25/server/tools
+    - https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization
+  classification:
+    cwe-id: CWE-306
+  metadata:
+    verified: true
+    max-request: 3
+  tags: mcp,ai,llm,exposure,unauth,misconfig
+
+flow: http(1) && http(2)
+
+http:
+  - method: POST
+    path:
+      - "{{BaseURL}}/mcp"
+    headers:
+      Content-Type: application/json
+      Accept: application/json, text/event-stream
+      MCP-Protocol-Version: "2025-11-25"
+    body: '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"nuclei","version":"1.0"}}}'
+    max-size: 65536
+
+    matchers:
+      - type: word
+        part: body
+        words:
+          - '"serverInfo"'
+        internal: true
+
+    extractors:
+      - type: kval
+        name: session
+        internal: true
+        kval:
+          - mcp_session_id
+
+  - method: POST
+    path:
+      - "{{BaseURL}}/mcp"
+    headers:
+      Content-Type: application/json
+      Accept: application/json, text/event-stream
+      MCP-Protocol-Version: "2025-11-25"
+      Mcp-Session-Id: "{{session}}"
+    body: '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+    max-size: 262144
+
+    matchers-condition: and
+    matchers:
+      - type: status
+        status:
+          - 200
+      - type: word
+        part: body
+        words:
+          - '"tools"'
+          - '"inputSchema"'
+        condition: and
+
+    extractors:
+      - type: regex
+        name: tools
+        part: body
+        group: 1
+        regex:
+          - '"name"\s*:\s*"([A-Za-z0-9_.\-]{1,64})"\s*,\s*"(?:description|title|inputSchema)"'
