@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-21
+
+### Added
+- Composite **GitHub Action** (`action.yml`): scan an MCP server with
+  `uses: garag0l/nuclei-templates-mcp@v0.1.1`. It installs nuclei (pinned,
+  checksum-verified), runs the bundled templates against `target`, and supports
+  a `validate` mode. Inputs are passed through env vars (no template injection),
+  and an end-to-end CI job validates the templates and scans the vulnerable mock
+  server through the action, asserting the 5 expected matches.
+
 ## [0.1.0] - 2026-11-21
 
 ### Added

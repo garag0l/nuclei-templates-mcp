@@ -18,6 +18,22 @@ nuclei -t nuclei-templates-mcp/http/mcp/ -l targets.txt -jsonl -o mcp-findings.j
 
 Requires Nuclei v3.
 
+### GitHub Action
+
+Scan a deployed MCP server from CI without installing nuclei yourself (Linux
+runners):
+
+```yaml
+- uses: garag0l/nuclei-templates-mcp@v0.1.1
+  with:
+    target: https://mcp.example.com
+    output: mcp-findings.jsonl
+```
+
+Inputs: `target` (the MCP server URL), `validate` (`"true"` to only validate the
+templates), `output` (JSONL path), `nuclei-version` (pinned, checksum-verified
+install), `templates`, and `args`. Only scan servers you are authorized to test.
+
 ## Why this exists
 
 Trend Micro counted roughly 1,470 MCP servers exposed to the internet in 2026, many of them reachable without credentials. Several SDK advisories that year were about local servers that any web page could reach: missing DNS-rebinding protection, and cross-site `text/plain` requests that skip CORS preflight. Neither the public Nuclei templates nor the usual scanners had MCP-aware checks. These templates speak the protocol properly: a JSON-RPC `initialize` over Streamable HTTP, the legacy SSE transport, and RFC 9728 metadata.
