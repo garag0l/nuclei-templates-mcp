@@ -1,0 +1,91 @@
+name: "MCP Nuclei Templates"
+description: "Scan a running Model Context Protocol (MCP) server with nuclei for unauthenticated access, tools exposed without auth, cross-site text/plain JSON-RPC (CVE-2026-33252), Host-header/DNS-rebinding gaps, and legacy unauthenticated SSE."
+author: "Murat Bekgi"
+branding:
+  icon: "radio"
+  color: "red"
+
+inputs:
+  target:
+    description: "URL of the MCP server to scan (required unless validate=true)."
+    required: false
+    default: ""
+  validate:
+    description: "Set to 'true' to only validate the templates (no target, no scan)."
+    required: false
+    default: "false"
+  templates:
+    description: "Template path to run (default: the bundled http/ directory)."
+    required: false
+    default: ""
+  output:
+    description: "If set, write JSONL results here."
+    required: false
+    default: ""
+  nuclei-version:
+    description: "nuclei release version to install."
+    required: false
+    default: "3.11.1"
+  args:
+    description: "Extra arguments appended to the nuclei command (advanced)."
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Scan with the MCP templates
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        IN_TARGET: ${{ inputs.target }}
+        IN_VALIDATE: ${{ inputs.validate }}
+        IN_TEMPLATES: ${{ inputs.templates }}
+        IN_OUTPUT: ${{ inputs.output }}
+        IN_VERSION: ${{ inputs.nuclei-version }}
+        IN_ARGS: ${{ inputs.args }}
+      run: |
+        set -euo pipefail
+
+        if [ "$(uname -s)" != "Linux" ]; then
+          echo "::error::This action installs the Linux nuclei build; run it on a Linux runner." >&2
+          exit 2
+        fi
+        case "$(uname -m)" in
+          x86_64) arch=amd64 ;;
+          aarch64|arm64) arch=arm64 ;;
+          *) echo "::error::unsupported architecture $(uname -m)" >&2; exit 2 ;;
+        esac
+
+        # Install nuclei (pinned, checksum-verified).
+        workdir="$(mktemp -d)"
+        base="https://github.com/projectdiscovery/nuclei/releases/download/v${IN_VERSION}"
+        curl -sSL -o "$workdir/n.zip" "$base/nuclei_${IN_VERSION}_linux_${arch}.zip"
+        curl -sSL -o "$workdir/sums.txt" "$base/nuclei_${IN_VERSION}_checksums.txt"
+        grep "nuclei_${IN_VERSION}_linux_${arch}.zip" "$workdir/sums.txt" \
+          | awk -v f="$workdir/n.zip" '{print $1"  "f}' | sha256sum -c -
+        unzip -q -o "$workdir/n.zip" nuclei -d "$workdir"
+        nuclei="$workdir/nuclei"
+        chmod +x "$nuclei"
+        "$nuclei" -version
+
+        templates="${IN_TEMPLATES:-$ACTION_PATH/http}"
+
+        if [ "$IN_VALIDATE" = "true" ]; then
+          "$nuclei" -validate -t "$templates" -disable-update-check
+          exit 0
+        fi
+
+        if [ -z "$IN_TARGET" ]; then
+          echo "::error::Provide 'target' (or set validate=true)." >&2
+          exit 2
+        fi
+
+        out=()
+        [ -n "$IN_OUTPUT" ] && out=(-jsonl -o "$IN_OUTPUT")
+        # IN_ARGS is an intentional word-split escape hatch for extra flags.
+        # shellcheck disable=SC2086
+        "$nuclei" -u "$IN_TARGET" -t "$templates" \
+          -disable-update-check -no-interactsh \
+          "${out[@]}" \
+          $IN_ARGS
